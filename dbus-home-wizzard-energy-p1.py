@@ -23,7 +23,7 @@ from vedbus import VeDbusService
 
 
 class DbusHomeWizzardEnergyP1Service:
-    def __init__(self, paths, productname='Home Wizzard Energy P1', connection='Home Wizzard Energy P1 HTTP JSOn service'):
+    def __init__(self, paths, productname='HomeWizard Energy P1', connection='HomeWizard Energy P1 HTTP JSOn service'):
         config = self._getConfig()
         deviceinstance = int(config['DEFAULT']['DeviceInstance'])
         customname = config['DEFAULT']['CustomName']
@@ -130,7 +130,7 @@ class DbusHomeWizzardEnergyP1Service:
         
         # check for response
         if not meter_r:
-            raise ConnectionError("No response from Home Wizzard Energy - %s" % (URL))
+            raise ConnectionError("No response from HomeWizard Energy - %s" % (URL))
         
         meter_data = meter_r.json()     
         
