@@ -56,7 +56,7 @@ After that call the install.sh script.
 
 The following script should do everything for you:
 ```
-wget https://github.com/back2basic/dbus-HomeWizard-Energy-P1/archive/refs/heads/main.zip
+wget https://github.com/wpte/dbus-HomeWizard-Energy-P1/archive/refs/heads/main.zip
 unzip main.zip "dbus-HomeWizard-Energy-P1-main/*" -d /data
 mv /data/dbus-HomeWizard-Energy-P1-main /data/dbus-HomeWizard-Energy-P1
 chmod a+x /data/dbus-HomeWizard-Energy-P1/install.sh
