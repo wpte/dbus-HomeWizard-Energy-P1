@@ -144,8 +144,50 @@ class DbusHomeWizzardEnergyP1Service:
         logging.info("Last '/Ac/Power': %s" % (self._dbusservice['/Ac/Power']))
         logging.info("--- End: sign of life ---")
         return True
- 
-    def _update(self):   
+
+    def _remap_phases(self, meter_data):
+        """
+        Remap the phases based on the L1Position configuration.
+        """
+        config = self._getConfig()
+        l1_position = int(config['ONPREMISE']['L1Position'])
+
+        if l1_position == 1:
+            return meter_data
+        elif l1_position == 2:
+            return {
+                'active_power_w': meter_data['active_power_w'],
+                'active_voltage_l1_v': meter_data['active_voltage_l2_v'],
+                'active_voltage_l2_v': meter_data['active_voltage_l3_v'],
+                'active_voltage_l3_v': meter_data['active_voltage_l1_v'],
+                'active_current_l1_a': meter_data['active_current_l2_a'],
+                'active_current_l2_a': meter_data['active_current_l3_a'],
+                'active_current_l3_a': meter_data['active_current_l1_a'],
+                'active_power_l1_w': meter_data['active_power_l2_w'],
+                'active_power_l2_w': meter_data['active_power_l3_w'],
+                'active_power_l3_w': meter_data['active_power_l1_w'],
+                'total_power_import_kwh': meter_data['total_power_import_kwh'],
+                'total_power_export_kwh': meter_data['total_power_export_kwh']
+            }
+        elif l1_position == 3:
+            return {
+                'active_power_w': meter_data['active_power_w'],
+                'active_voltage_l1_v': meter_data['active_voltage_l3_v'],
+                'active_voltage_l2_v': meter_data['active_voltage_l1_v'],
+                'active_voltage_l3_v': meter_data['active_voltage_l2_v'],
+                'active_current_l1_a': meter_data['active_current_l3_a'],
+                'active_current_l2_a': meter_data['active_current_l1_a'],
+                'active_current_l3_a': meter_data['active_current_l2_a'],
+                'active_power_l1_w': meter_data['active_power_l3_w'],
+                'active_power_l2_w': meter_data['active_power_l1_w'],
+                'active_power_l3_w': meter_data['active_power_l2_w'],
+                'total_power_import_kwh': meter_data['total_power_import_kwh'],
+                'total_power_export_kwh': meter_data['total_power_export_kwh']
+            }
+        else:
+            raise ValueError("Invalid L1Position value in config.ini")
+
+    def _update(self):
         try:
             # get data from HW P1
             meter_data = self._getP1Data()
@@ -163,6 +205,8 @@ class DbusHomeWizzardEnergyP1Service:
                 self._dbusservice['/Ac/L1/Energy/Forward'] = (meter_data['total_power_import_kwh']/1000)
                 self._dbusservice['/Ac/L1/Energy/Reverse'] = (meter_data['total_power_export_kwh']/1000) 
             if phases == '3':
+                # remap phases based on L1Position
+                meter_data = self._remap_phases(meter_data)
                 # send data to DBus for 3 pahse system
                 self._dbusservice['/Ac/Power'] = meter_data['active_power_w']
                 self._dbusservice['/Ac/L1/Voltage'] = meter_data['active_voltage_l1_v']
