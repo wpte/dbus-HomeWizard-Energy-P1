@@ -57,7 +57,7 @@ class DbusHomeWizardEnergyP1Service:
         self._dbusservice.add_path('/ProductName', productname)
         self._dbusservice.add_path('/CustomName', customname)
         self._dbusservice.add_path('/Latency', None)
-        self._dbusservice.add_path('/FirmwareVersion', 0.2)
+        self._dbusservice.add_path('/FirmwareVersion', self._getFirmwareVersion())
         self._dbusservice.add_path('/HardwareVersion', 0)
         self._dbusservice.add_path('/Connected', 1)
         self._dbusservice.add_path('/Role', role)
@@ -157,6 +157,26 @@ class DbusHomeWizardEnergyP1Service:
             raise ValueError("Converting response to JSON failed")
 
         return meter_data
+
+    def _getFirmwareVersion(self):
+        """
+        Get the firmware version from the HomeWizard Energy.
+        """
+        config = self._getConfig()
+        URL = "http://%s/api/" % (config['ONPREMISE']['Host'])
+        response = requests.get(url=URL, timeout=5)
+
+        # check for response
+        if not response:
+            raise ConnectionError("No response from HomeWizard Energy - %s" % (URL))
+
+        data = response.json()
+
+        # check for JSON
+        if not data:
+            raise ValueError("Converting response to JSON failed")
+
+        return data['firmware_version']
 
     def _signOfLife(self):
         """
