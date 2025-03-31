@@ -16,7 +16,7 @@ import sys
 import time
 import requests # for http GET
 import configparser # for config/ini file
- 
+
 # our own packages from victron
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), '/opt/victronenergy/dbus-systemcalc-py/ext/velib_python'))
 from vedbus import VeDbusService
@@ -29,11 +29,11 @@ class DbusHomeWizzardEnergyP1Service:
         customname = config['DEFAULT']['CustomName']
         role = config['DEFAULT']['Role']
 
-        allowed_roles = ['pvinverter','grid']
+        allowed_roles = ['pvinverter', 'grid']
         if role in allowed_roles:
             servicename = 'com.victronenergy.' + role
         else:
-            logging.error("Configured Role: %s is not in the allowed list")
+            logging.error("Configured Role: %s is not in the allowed list", role)
             exit()
 
         if role == 'pvinverter':
@@ -65,8 +65,8 @@ class DbusHomeWizzardEnergyP1Service:
         
         # add path values to dbus
         for path, settings in self._paths.items():
-          self._dbusservice.add_path(
-            path, settings['initial'], gettextcallback=settings['textformat'], writeable=True, onchangecallback=self._handlechangedvalue)
+            self._dbusservice.add_path(
+                path, settings['initial'], gettextcallback=settings['textformat'], writeable=True, onchangecallback=self._handlechangedvalue)
     
         # last update
         self._lastUpdate = 0
@@ -75,22 +75,23 @@ class DbusHomeWizzardEnergyP1Service:
         gobject.timeout_add(500, self._update) # pause 500ms before the next request
         
         # add _signOfLife 'timer' to get feedback in log every 5minutes
-        gobject.timeout_add(self._getSignOfLifeInterval()*60*1000, self._signOfLife)
+        gobject.timeout_add(self._getSignOfLifeInterval() * 60 * 1000, self._signOfLife)
     
     def _getP1Serial(self):
         meter_data = self._getP1Data()  
         
         if not meter_data['unique_id']:
+            logging.error("Response does not contain 'unique_id' attribute")
             raise ValueError("Response does not contain 'unique_id' attribute")
         
         serial = meter_data['unique_id']
         return serial
 
     def _getConfig(self):
-        config = configparser.ConfigParser()
-        config.read("%s/config.ini" % (os.path.dirname(os.path.realpath(__file__))))
-        return config;
- 
+        if not hasattr(self, '_config'):
+            self._config = configparser.ConfigParser()
+            self._config.read("%s/config.ini" % (os.path.dirname(os.path.realpath(__file__))))
+        return self._config
  
     def _getSignOfLifeInterval(self):
         config = self._getConfig()
@@ -110,23 +111,20 @@ class DbusHomeWizzardEnergyP1Service:
         
         return int(value)
 
-
     def _getP1StatusUrl(self):
         config = self._getConfig()
         accessType = config['DEFAULT']['AccessType']
         
         if accessType == 'OnPremise': 
             URL = "http://%s/api/v1/data" % (config['ONPREMISE']['Host'])
-            # URL = URL.replace(":@", "")
         else:
             raise ValueError("AccessType %s is not supported" % (config['DEFAULT']['AccessType']))
         
         return URL
   
-  
     def _getP1Data(self):
         URL = self._getP1StatusUrl()
-        meter_r = requests.get(url = URL, timeout=5)
+        meter_r = requests.get(url=URL, timeout=5)
         
         # check for response
         if not meter_r:
@@ -140,7 +138,6 @@ class DbusHomeWizzardEnergyP1Service:
         
         return meter_data
   
-  
     def _signOfLife(self):
         logging.info("--- Start: sign of life ---")
         logging.info("Last _update() call: %s" % (self._lastUpdate))
@@ -150,7 +147,7 @@ class DbusHomeWizzardEnergyP1Service:
  
     def _update(self):   
         try:
-            #get data from Shelly 3em
+            # get data from Shelly 3em
             meter_data = self._getP1Data()
             config = self._getConfig()
 
@@ -194,37 +191,19 @@ class DbusHomeWizzardEnergyP1Service:
                 self._dbusservice['/Ac/L1/Power'] = meter_data['active_power_l1_w']
                 self._dbusservice['/Ac/L2/Power'] = meter_data['active_power_l2_w']
                 self._dbusservice['/Ac/L3/Power'] = meter_data['active_power_l3_w']
-                self._dbusservice['/Ac/Energy/Forward'] = (meter_data['total_power_import_kwh']/1000)
-                self._dbusservice['/Ac/Energy/Reverse'] = (meter_data['total_power_export_kwh']/1000)
-                # self._dbusservice['/Ac/L1/Energy/Forward'] = (meter_data['emeters'][0]['total']/1000)
-                # self._dbusservice['/Ac/L2/Energy/Forward'] = (meter_data['emeters'][1]['total']/1000)
-                # self._dbusservice['/Ac/L3/Energy/Forward'] = (meter_data['emeters'][2]['total']/1000)
-                # self._dbusservice['/Ac/L1/Energy/Reverse'] = (meter_data['emeters'][0]['total_returned']/1000) 
-                # self._dbusservice['/Ac/L2/Energy/Reverse'] = (meter_data['emeters'][1]['total_returned']/1000) 
-                # self._dbusservice['/Ac/L3/Energy/Reverse'] = (meter_data['emeters'][2]['total_returned']/1000) 
+                self._dbusservice['/Ac/Energy/Forward'] = (meter_data['total_power_import_kwh'] / 1000)
+                self._dbusservice['/Ac/Energy/Reverse'] = (meter_data['total_power_export_kwh'] / 1000)
 
-            # Old version
-            #self._dbusservice['/Ac/Energy/Forward'] = self._dbusservice['/Ac/L1/Energy/Forward'] + self._dbusservice['/Ac/L2/Energy/Forward'] + self._dbusservice['/Ac/L3/Energy/Forward']
-            #self._dbusservice['/Ac/Energy/Reverse'] = self._dbusservice['/Ac/L1/Energy/Reverse'] + self._dbusservice['/Ac/L2/Energy/Reverse'] + self._dbusservice['/Ac/L3/Energy/Reverse'] 
-            
-            # New Version - from xris99
-            #Calc = 60min * 60 sec / 0.500 (refresh interval of 500ms) * 1000
-            # if (self._dbusservice['/Ac/Power'] > 0):
-            #     self._dbusservice['/Ac/Energy/Forward'] = self._dbusservice['/Ac/Energy/Forward'] + (self._dbusservice['/Ac/Power']/(60*60/0.5*1000))            
-            # if (self._dbusservice['/Ac/Power'] < 0):
-            #     self._dbusservice['/Ac/Energy/Reverse'] = self._dbusservice['/Ac/Energy/Reverse'] + (self._dbusservice['/Ac/Power']*-1/(60*60/0.5*1000))
-
-            
-            #logging
+            # logging
             logging.debug("House Consumption (/Ac/Power): %s" % (self._dbusservice['/Ac/Power']))
             logging.debug("House Forward (/Ac/Energy/Forward): %s" % (self._dbusservice['/Ac/Energy/Forward']))
-            logging.debug("House Reverse (/Ac/Energy/Revers): %s" % (self._dbusservice['/Ac/Energy/Reverse']))
-            logging.debug("---");
+            logging.debug("House Reverse (/Ac/Energy/Reverse): %s" % (self._dbusservice['/Ac/Energy/Reverse']))
+            logging.debug("---")
             
-            # increment UpdateIndex - to show that new data is available an wrap
-            self._dbusservice['/UpdateIndex'] = (self._dbusservice['/UpdateIndex'] + 1 ) % 256
+            # increment UpdateIndex - to show that new data is available and wrap
+            self._dbusservice['/UpdateIndex'] = (self._dbusservice['/UpdateIndex'] + 1) % 256
 
-            #update lastupdate vars
+            # update lastupdate vars
             self._lastUpdate = time.time()
         except (ValueError, requests.exceptions.ConnectionError, requests.exceptions.Timeout, ConnectionError) as e:
             logging.critical('Error getting data from Shelly - check network or Shelly status. Setting power values to 0. Details: %s', e, exc_info=e)       
@@ -232,7 +211,7 @@ class DbusHomeWizzardEnergyP1Service:
             self._dbusservice['/Ac/L2/Power'] = 0                                       
             self._dbusservice['/Ac/L3/Power'] = 0
             self._dbusservice['/Ac/Power'] = 0
-            self._dbusservice['/UpdateIndex'] = (self._dbusservice['/UpdateIndex'] + 1 ) % 256        
+            self._dbusservice['/UpdateIndex'] = (self._dbusservice['/UpdateIndex'] + 1) % 256        
         except Exception as e:
             logging.critical('Error at %s', '_update', exc_info=e)
         
@@ -243,10 +222,7 @@ class DbusHomeWizzardEnergyP1Service:
         logging.debug("someone else updated %s to %s" % (path, value))
         return True # accept the change
 
-  
-  
-  
-  
+
 def getLogLevel():
     config = configparser.ConfigParser()
     config.read("%s/config.ini" % (os.path.dirname(os.path.realpath(__file__))))
@@ -261,7 +237,7 @@ def getLogLevel():
 
 
 def main():
-    #configure logging
+    # configure logging
     logging.basicConfig(format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
         level=getLogLevel(),
@@ -271,20 +247,19 @@ def main():
         ])
  
     try:
-        logging.info("Start");
+        logging.info("Start")
     
         from dbus.mainloop.glib import DBusGMainLoop
         # Have a mainloop, so we can send/receive asynchronous calls to and from dbus
         DBusGMainLoop(set_as_default=True)
         
-        #formatting 
+        # formatting 
         _kwh = lambda p, v: (str(round(v, 2)) + ' kWh')
         _a = lambda p, v: (str(round(v, 1)) + ' A')
         _w = lambda p, v: (str(round(v, 1)) + ' W')
         _v = lambda p, v: (str(round(v, 1)) + ' V')   
         
-        #start our main-service
-        
+        # start our main-service
         pvac_output = DbusHomeWizzardEnergyP1Service(
             paths={
                 '/Ac/Energy/Forward': {'initial': 0, 'textformat': _kwh}, # energy bought from the grid
@@ -303,13 +278,7 @@ def main():
                 '/Ac/L1/Power': {'initial': 0, 'textformat': _w},
                 '/Ac/L2/Power': {'initial': 0, 'textformat': _w},
                 '/Ac/L3/Power': {'initial': 0, 'textformat': _w},
-                # '/Ac/L1/Energy/Forward': {'initial': 0, 'textformat': _kwh},
-                # '/Ac/L2/Energy/Forward': {'initial': 0, 'textformat': _kwh},
-                # '/Ac/L3/Energy/Forward': {'initial': 0, 'textformat': _kwh},
-                # '/Ac/L1/Energy/Reverse': {'initial': 0, 'textformat': _kwh},
-                # '/Ac/L2/Energy/Reverse': {'initial': 0, 'textformat': _kwh},
-                # '/Ac/L3/Energy/Reverse': {'initial': 0, 'textformat': _kwh},
-                })
+            })
         logging.info('Connected to dbus, and switching over to gobject.MainLoop() (= event based)')
         mainloop = gobject.MainLoop()
         mainloop.run()            
