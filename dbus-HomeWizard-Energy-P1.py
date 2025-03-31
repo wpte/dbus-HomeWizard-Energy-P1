@@ -129,15 +129,7 @@ class DbusHomeWizardEnergyP1Service:
         """
         Get the P1 status URL from the configuration.
         """
-        config = self._getConfig()
-        accessType = config['DEFAULT']['AccessType']
-
-        if accessType == 'OnPremise':
-            URL = "http://%s/api/v1/data" % (config['ONPREMISE']['Host'])
-        else:
-            raise ValueError("AccessType %s is not supported" % (config['DEFAULT']['AccessType']))
-
-        return URL
+        return "http://%s/api/v1/data" % (config['ONPREMISE']['Host'])
 
     def _getP1Data(self):
         """
