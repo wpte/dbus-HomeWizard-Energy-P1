@@ -129,6 +129,7 @@ class DbusHomeWizardEnergyP1Service:
         """
         Get the P1 status URL from the configuration.
         """
+        config = self._getConfig()
         return "http://%s/api/v1/data" % (config['ONPREMISE']['Host'])
 
     def _getP1Data(self):
