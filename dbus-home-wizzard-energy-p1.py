@@ -147,40 +147,23 @@ class DbusHomeWizzardEnergyP1Service:
  
     def _update(self):   
         try:
-            # get data from Shelly 3em
+            # get data from HW P1
             meter_data = self._getP1Data()
             config = self._getConfig()
-
-            # No remapping possible!
-            # try:
-            #     remapL1 = int(config['ONPREMISE']['L1Position'])
-            # except KeyError:
-            #     remapL1 = 1
-
-            # if remapL1 > 1:
-            #     old_l1 = meter_data['emeters'][0]
-            #     meter_data['emeters'][0] = meter_data['emeters'][remapL1-1]
-            #     meter_data['emeters'][remapL1-1] = old_l1
             phases = config['DEFAULT']['Phases']
 
             if phases == '1':
-                #send data to DBus for 3pahse system
+                # send data to DBus for 1 pahse system
                 self._dbusservice['/Ac/Power'] = meter_data['active_power_w']
                 self._dbusservice['/Ac/L1/Voltage'] = meter_data['active_voltage_l1_v']
-                # self._dbusservice['/Ac/L2/Voltage'] = meter_data['active_voltage_l2_v']
-                # self._dbusservice['/Ac/L3/Voltage'] = meter_data['active_voltage_l3_v']
                 self._dbusservice['/Ac/L1/Current'] = meter_data['active_current_l1_a']
-                # self._dbusservice['/Ac/L2/Current'] = meter_data['active_current_l2_a']
-                # self._dbusservice['/Ac/L3/Current'] = meter_data['active_current_l3_a']
                 self._dbusservice['/Ac/L1/Power'] = meter_data['active_power_l1_w']
-                # self._dbusservice['/Ac/L2/Power'] = meter_data['active_power_l1_w']
-                # self._dbusservice['/Ac/L3/Power'] = meter_data['active_power_l1_w']
                 self._dbusservice['/Ac/Energy/Forward'] = (meter_data['total_power_import_kwh']/1000)
                 self._dbusservice['/Ac/Energy/Reverse'] = (meter_data['total_power_export_kwh']/1000)
                 self._dbusservice['/Ac/L1/Energy/Forward'] = (meter_data['total_power_import_kwh']/1000)
                 self._dbusservice['/Ac/L1/Energy/Reverse'] = (meter_data['total_power_export_kwh']/1000) 
             if phases == '3':
-                #send data to DBus for 3pahse system
+                # send data to DBus for 3 pahse system
                 self._dbusservice['/Ac/Power'] = meter_data['active_power_w']
                 self._dbusservice['/Ac/L1/Voltage'] = meter_data['active_voltage_l1_v']
                 self._dbusservice['/Ac/L2/Voltage'] = meter_data['active_voltage_l2_v']
@@ -206,7 +189,7 @@ class DbusHomeWizzardEnergyP1Service:
             # update lastupdate vars
             self._lastUpdate = time.time()
         except (ValueError, requests.exceptions.ConnectionError, requests.exceptions.Timeout, ConnectionError) as e:
-            logging.critical('Error getting data from Shelly - check network or Shelly status. Setting power values to 0. Details: %s', e, exc_info=e)       
+            logging.critical('Error getting data from HW P1 - check network or HW P1 status. Setting power values to 0. Details: %s', e, exc_info=e)       
             self._dbusservice['/Ac/L1/Power'] = 0                                       
             self._dbusservice['/Ac/L2/Power'] = 0                                       
             self._dbusservice['/Ac/L3/Power'] = 0
