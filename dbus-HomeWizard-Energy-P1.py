@@ -241,8 +241,6 @@ class DbusHomeWizardEnergyP1Service:
                 self._dbusservice['/Ac/L1/Power'] = meter_data['active_power_l1_w']
                 self._dbusservice['/Ac/Energy/Forward'] = (meter_data['total_power_import_kwh'] / 1000)
                 self._dbusservice['/Ac/Energy/Reverse'] = (meter_data['total_power_export_kwh'] / 1000)
-                self._dbusservice['/Ac/L1/Energy/Forward'] = (meter_data['total_power_import_kwh'] / 1000)
-                self._dbusservice['/Ac/L1/Energy/Reverse'] = (meter_data['total_power_export_kwh'] / 1000)
             if phases == '3':
                 # remap phases based on L1Position
                 meter_data = self._remap_phases(meter_data)
