@@ -45,7 +45,7 @@ class DbusHomeWizzardEnergyP1Service:
         self._paths = paths
 
         self._dbusservice.add_path('/Mgmt/ProcessName', __file__)
-        self._dbusservice.add_path('/Mgmt/ProcessVersion', 'Unkown version, and running on Python ' + platform.python_version())
+        self._dbusservice.add_path('/Mgmt/ProcessVersion', 'Unknown version, and running on Python ' + platform.python_version())
         self._dbusservice.add_path('/Mgmt/Connection', connection)
     
         # Create the mandatory objects
