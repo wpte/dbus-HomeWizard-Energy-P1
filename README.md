@@ -1,12 +1,9 @@
-# W.I.P. -> Converting from dbus-shelly-3em-smartmeter
 # dbus-homewizard-energy-p1
 Integrate HomeWizard Energy P1 meter into [Victron Energies Venus OS](https://github.com/victronenergy/venus)
 
 ## Purpose
-With the scripts in this repo it should be easy possible to install, uninstall, restart a service that connects the Shelly 3EM to the VenusOS and GX devices from Victron.
-Idea is pasend on @RalfZim project linked below.
-
-
+With the scripts in this repo, it should be easy to install, uninstall, and restart a service that connects the HomeWizard Energy P1 to the VenusOS and GX devices from Victron.
+The idea is based on @RalfZim's project linked below.
 
 ## Inspiration
 This project is my first on GitHub and with the Victron Venus OS, so I took some ideas and approaches from the following projects - many thanks for sharing the knowledge:
@@ -18,8 +15,8 @@ This project is my first on GitHub and with the Victron Venus OS, so I took some
 
 ## How it works
 ### My setup
-- HomeWizard Energy P1 with latest firmware 
-  - 1 or 3-Phase installation (normal for Netherlands)
+- HomeWizard Energy P1 with the latest firmware 
+  - 1 or 3-Phase installation (normal for the Netherlands)
   - Connected to Wifi network "A"
   - IP 192.168.2.13/24  
 - Victron Energy Cerbo GX with Venus OS - Firmware v3.11
@@ -28,17 +25,17 @@ This project is my first on GitHub and with the Victron Venus OS, so I took some
   - IP 192.168.2.20/24
 
 ### Details / Process
-As mentioned above the script is inspired by @RalfZim fronius smartmeter implementation.
+As mentioned above, the script is inspired by @RalfZim's Fronius smartmeter implementation.
 So what is the script doing:
 - Running as a service
-- connecting to DBus of the Venus OS `com.victronenergy.grid.http_40` or `com.victronenergy.pvinverter.http_40`
-- After successful DBus connection HomeWizard P1 is accessed via REST-API - simply the /status is called and a JSON is returned with all details
+- Connecting to DBus of the Venus OS `com.victronenergy.grid.http_40` or `com.victronenergy.pvinverter.http_40`
+- After successful DBus connection, HomeWizard P1 is accessed via REST-API - simply the /status is called and a JSON is returned with all details
   A sample JSON file from HomeWizard Energy P1 can be found [here](docs/homewizard-energy-p1.json)
 - Serial is taken from the response as device serial
 - Paths are added to the DBus with default value 0 - including some settings like name, etc
-- After that a "loop" is started which pulls HomeWizard P1 data every 750ms from the REST-API and updates the values in the DBus
+- After that, a "loop" is started which pulls HomeWizard P1 data every 750ms from the REST-API and updates the values in the DBus
 
-Thats it 😄
+That's it 😄
 
 ### Pictures
 ![Tile Overview](img/VenusOs_Overview.png)
@@ -46,13 +43,10 @@ Thats it 😄
 ![SmartMeter - Values](img/VenusOs_P1.png)
 ![SmartMeter - Device Details](img/VenusOs_Service.png)
 
-
-
-
 ## Install & Configuration
 ### Get the code
-Just grap a copy of the main branche and copy them to `/data/dbus-HomeWizard-Energy-P1`.
-After that call the install.sh script.
+Just grab a copy of the main branch and copy it to `/data/dbus-HomeWizard-Energy-P1`.
+After that, call the install.sh script.
 
 The following script should do everything for you:
 ```
@@ -63,31 +57,27 @@ chmod a+x /data/dbus-HomeWizard-Energy-P1/install.sh
 /data/dbus-HomeWizard-Energy-P1/install.sh
 rm main.zip
 ```
-⚠️ Check configuration after that - because service is already installed an running and with wrong connection data (host, username, pwd) you will spam the log-file
+⚠️ Check the configuration after that - because the service is already installed and running, and with wrong connection data (host, username, pwd) you will spam the log file.
 
 ### Change config.ini
-Within the project there is a file `/data/dbus-HomeWizard-Energy-P1/config.ini` - just change the values - most important is the host, username and password in section "ONPREMISE". More details below:
+Within the project, there is a file `/data/dbus-HomeWizard-Energy-P1/config.ini` - just change the values - most important is the host, username, and password in the section "ONPREMISE". More details below:
 
-| Section  | Config vlaue | Explanation |
+| Section  | Config value | Explanation |
 | ------------- | ------------- | ------------- |
-| DEFAULT  | AccessType | Fixed value 'OnPremise' |
-| DEFAULT  | SignOfLifeLog  | Time in minutes how often a status is added to the log-file `current.log` with log-level INFO |
-| DEFAULT  | CustomName  | Name of your device - usefull if you want to run multiple versions of the script |
+| DEFAULT  | SignOfLifeLog  | Time in minutes how often a status is added to the log file `current.log` with log-level INFO |
+| DEFAULT  | CustomName  | Name of your device - useful if you want to run multiple versions of the script |
 | DEFAULT  | DeviceInstance  | DeviceInstanceNumber e.g. 40 |
 | DEFAULT  | Role | Fixed value:  'GRID' |
 | DEFAULT  | Position | Fixed value: 0 = AC|
 | DEFAULT  | LogLevel  | Define the level of logging - lookup: https://docs.python.org/3/library/logging.html#levels |
 | DEFAULT  | Phases  | 1 for 1 phase system / 3 for 3 phase system |
-| ONPREMISE  | Host | IP or hostname of on-premise Shelly 3EM web-interface |
-<!-- | ONPREMISE  | Username | Username for htaccess login - leave blank if no username/password required |
-| ONPREMISE  | Password | Password for htaccess login - leave blank if no username/password required |
-| ONPREMISE  | L1Position | Which input on the Shelly in 3-phase grid is supplying a single Multi | -->
-
+| ONPREMISE  | Host | IP or hostname of on-premise HomeWizard Energy P1 web interface |
+| ONPREMISE  | L1Position | Which input on the HomeWizard in 3-phase grid is supplying a single Multi |
 
 <!-- ### Remapping L1
-In a 3-phase grid with a single Multi, Venus OS expects L1 to be supplying the only Multi. This is not always the case. If for example your Multi is supplied by L3 (Input `C` on the Shelly) your GX device will show AC Loads as consuming from both L1 and L3. Setting `L1Position` to the appropriate Shelly input allows for remapping the phases and showing correct data on the GX device.
+In a 3-phase grid with a single Multi, Venus OS expects L1 to be supplying the only Multi. This is not always the case. If for example your Multi is supplied by L3 (Input `C` on the HomeWizard) your GX device will show AC Loads as consuming from both L1 and L3. Setting `L1Position` to the appropriate HomeWizard input allows for remapping the phases and showing correct data on the GX device.
 
-If your single Multi is connected to the Input `A` on the Shelly you don't need to change this setting. Setting `L1Position` to `2` would swap the `B` CT & Voltage sensors data on the Shelly with the `A` CT & Voltage sensors data on the Shelly. Respectively, setting `L1Position` to `3` would swap `A` and `C` inputs. -->
+If your single Multi is connected to the Input `A` on the HomeWizard you don't need to change this setting. Setting `L1Position` to `2` would swap the `B` CT & Voltage sensors data on the HomeWizard with the `A` CT & Voltage sensors data on the HomeWizard. Respectively, setting `L1Position` to `3` would swap `A` and `C` inputs. -->
 
 ## Used documentation
 - https://github.com/victronenergy/venus/wiki/dbus#grid   DBus paths for Victron namespace GRID
