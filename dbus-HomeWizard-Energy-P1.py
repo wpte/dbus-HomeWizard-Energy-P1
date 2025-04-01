@@ -239,8 +239,8 @@ class DbusHomeWizardEnergyP1Service:
                 self._dbusservice['/Ac/L1/Voltage'] = meter_data['active_voltage_l1_v']
                 self._dbusservice['/Ac/L1/Current'] = meter_data['active_current_l1_a']
                 self._dbusservice['/Ac/L1/Power'] = meter_data['active_power_l1_w']
-                self._dbusservice['/Ac/Energy/Forward'] = (meter_data['total_power_import_kwh'] / 1000)
-                self._dbusservice['/Ac/Energy/Reverse'] = (meter_data['total_power_export_kwh'] / 1000)
+                self._dbusservice['/Ac/Energy/Forward'] = (meter_data['total_power_import_kwh'])
+                self._dbusservice['/Ac/Energy/Reverse'] = (meter_data['total_power_export_kwh'])
             if phases == '3':
                 # remap phases based on L1Position
                 meter_data = self._remap_phases(meter_data)
@@ -255,8 +255,8 @@ class DbusHomeWizardEnergyP1Service:
                 self._dbusservice['/Ac/L1/Power'] = meter_data['active_power_l1_w']
                 self._dbusservice['/Ac/L2/Power'] = meter_data['active_power_l2_w']
                 self._dbusservice['/Ac/L3/Power'] = meter_data['active_power_l3_w']
-                self._dbusservice['/Ac/Energy/Forward'] = (meter_data['total_power_import_kwh'] / 1000)
-                self._dbusservice['/Ac/Energy/Reverse'] = (meter_data['total_power_export_kwh'] / 1000)
+                self._dbusservice['/Ac/Energy/Forward'] = (meter_data['total_power_import_kwh'])
+                self._dbusservice['/Ac/Energy/Reverse'] = (meter_data['total_power_export_kwh'])
 
             # logging
             logging.debug("House Consumption (/Ac/Power): %s" % (self._dbusservice['/Ac/Power']))
