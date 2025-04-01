@@ -332,25 +332,56 @@ def main():
         _w = lambda p, v: (str(round(v, 1)) + ' W')
         _v = lambda p, v: (str(round(v, 1)) + ' V')
 
+        # Fetch initial data from P1 meter
+        try:
+            config = configparser.ConfigParser()
+            config.read("%s/config.ini" % (os.path.dirname(os.path.realpath(__file__))))
+            URL = "http://%s/api/v1/data" % (config['ONPREMISE']['Host'])
+            meter_r = requests.get(url=URL, timeout=5)
+            meter_data = meter_r.json()
+            initial_forward = meter_data['total_power_import_kwh']
+            initial_reverse = meter_data['total_power_export_kwh']
+            initial_power = meter_data['active_power_w']
+            initial_voltage_l1 = meter_data['active_voltage_l1_v']
+            initial_voltage_l2 = meter_data['active_voltage_l2_v']
+            initial_voltage_l3 = meter_data['active_voltage_l3_v']
+            initial_current_l1 = meter_data['active_current_l1_a']
+            initial_current_l2 = meter_data['active_current_l2_a']
+            initial_current_l3 = meter_data['active_current_l3_a']
+            initial_power_l1 = meter_data['active_power_l1_w']
+            initial_power_l2 = meter_data['active_power_l2_w']
+            initial_power_l3 = meter_data['active_power_l3_w']
+        except (ValueError, requests.exceptions.ConnectionError, requests.exceptions.Timeout, KeyError) as e:
+            logging.warning('Failed to fetch initial data from P1 meter, using default values. Details: %s', e)
+            initial_forward = 0
+            initial_reverse = 0
+            initial_power = 0
+            initial_voltage_l1 = 0
+            initial_voltage_l2 = 0
+            initial_voltage_l3 = 0
+            initial_current_l1 = 0
+            initial_current_l2 = 0
+            initial_current_l3 = 0
+            initial_power_l1 = 0
+            initial_power_l2 = 0
+            initial_power_l3 = 0
+
         # start our main-service
         pvac_output = DbusHomeWizardEnergyP1Service(
             paths={
-                '/Ac/Energy/Forward': {'initial': 0, 'textformat': _kwh},  # energy bought from the grid
-                '/Ac/Energy/Reverse': {'initial': 0, 'textformat': _kwh},  # energy sold to the grid
-                '/Ac/Power': {'initial': 0, 'textformat': _w},
+                '/Ac/Energy/Forward': {'initial': initial_forward, 'textformat': _kwh},  # energy bought from the grid
+                '/Ac/Energy/Reverse': {'initial': initial_reverse, 'textformat': _kwh},  # energy sold to the grid
+                '/Ac/Power': {'initial': initial_power, 'textformat': _w},
 
-                '/Ac/Current': {'initial': 0, 'textformat': _a},
-                '/Ac/Voltage': {'initial': 0, 'textformat': _v},
-
-                '/Ac/L1/Voltage': {'initial': 0, 'textformat': _v},
-                '/Ac/L2/Voltage': {'initial': 0, 'textformat': _v},
-                '/Ac/L3/Voltage': {'initial': 0, 'textformat': _v},
-                '/Ac/L1/Current': {'initial': 0, 'textformat': _a},
-                '/Ac/L2/Current': {'initial': 0, 'textformat': _a},
-                '/Ac/L3/Current': {'initial': 0, 'textformat': _a},
-                '/Ac/L1/Power': {'initial': 0, 'textformat': _w},
-                '/Ac/L2/Power': {'initial': 0, 'textformat': _w},
-                '/Ac/L3/Power': {'initial': 0, 'textformat': _w},
+                '/Ac/L1/Voltage': {'initial': initial_voltage_l1, 'textformat': _v},
+                '/Ac/L2/Voltage': {'initial': initial_voltage_l2, 'textformat': _v},
+                '/Ac/L3/Voltage': {'initial': initial_voltage_l3, 'textformat': _v},
+                '/Ac/L1/Current': {'initial': initial_current_l1, 'textformat': _a},
+                '/Ac/L2/Current': {'initial': initial_current_l2, 'textformat': _a},
+                '/Ac/L3/Current': {'initial': initial_current_l3, 'textformat': _a},
+                '/Ac/L1/Power': {'initial': initial_power_l1, 'textformat': _w},
+                '/Ac/L2/Power': {'initial': initial_power_l2, 'textformat': _w},
+                '/Ac/L3/Power': {'initial': initial_power_l3, 'textformat': _w},
             })
         logging.info('Connected to dbus, and switching over to gobject.MainLoop() (= event based)')
         mainloop = gobject.MainLoop()
