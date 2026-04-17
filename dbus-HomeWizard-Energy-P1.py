@@ -8,6 +8,7 @@ import logging.handlers
 import sys
 import os
 import time
+import threading
 import requests  # for http GET
 import configparser  # for config/ini file
 
@@ -73,6 +74,12 @@ class DbusHomeWizardEnergyP1Service:
         # last update
         self._lastUpdate = 0
 
+        # Background thread for non-blocking HTTP fetching
+        self._data_lock = threading.Lock()
+        self._cached_meter_data = {}
+        self._fetch_thread = threading.Thread(target=self._background_fetch, daemon=True)
+        self._fetch_thread.start()
+
         # add _update function 'timer'
         gobject.timeout_add(500, self._update)  # pause 500ms before the next request
 
@@ -83,14 +90,17 @@ class DbusHomeWizardEnergyP1Service:
         """
         Get the serial number from the P1 meter data.
         """
-        meter_data = self._getP1Data()
+        try:
+            meter_data = self._getP1Data()
 
-        if not meter_data['unique_id']:
-            logging.error("Response does not contain 'unique_id' attribute")
-            raise ValueError("Response does not contain 'unique_id' attribute")
+            if not meter_data.get('unique_id'):
+                logging.warning("Response does not contain 'unique_id' attribute")
+                return ''
 
-        serial = meter_data['unique_id']
-        return serial
+            return meter_data['unique_id']
+        except Exception as e:
+            logging.warning("Failed to get serial number: %s", e)
+            return ''
 
     def _getConfig(self):
         """
@@ -155,21 +165,25 @@ class DbusHomeWizardEnergyP1Service:
         """
         Get the firmware version from the HomeWizard Energy.
         """
-        config = self._getConfig()
-        URL = "http://%s/api/" % (config['ONPREMISE']['Host'])
-        response = requests.get(url=URL, timeout=5)
+        try:
+            config = self._getConfig()
+            URL = "http://%s/api/" % (config['ONPREMISE']['Host'])
+            response = requests.get(url=URL, timeout=5)
 
-        # check for response
-        if not response:
-            raise ConnectionError("No response from HomeWizard Energy - %s" % (URL))
+            # check for response
+            if not response:
+                raise ConnectionError("No response from HomeWizard Energy - %s" % (URL))
 
-        data = response.json()
+            data = response.json()
 
-        # check for JSON
-        if not data:
-            raise ValueError("Converting response to JSON failed")
+            # check for JSON
+            if not data:
+                raise ValueError("Converting response to JSON failed")
 
-        return data['firmware_version']
+            return data['firmware_version']
+        except Exception as e:
+            logging.warning("Failed to get firmware version: %s", e)
+            return 0
 
     def _signOfLife(self):
         """
@@ -180,6 +194,19 @@ class DbusHomeWizardEnergyP1Service:
         logging.info("Last '/Ac/Power': %s" % (self._dbusservice['/Ac/Power']))
         logging.info("--- End: sign of life ---")
         return True
+
+    def _background_fetch(self):
+        """
+        Background thread that polls the P1 meter and caches the data.
+        """
+        while True:
+            try:
+                data = self._getP1Data()
+                with self._data_lock:
+                    self._cached_meter_data = data
+            except Exception as e:
+                logging.error("Background fetch error: %s", e)
+            time.sleep(0.5)
 
     def _remap_phases(self, meter_data):
         """
@@ -228,8 +255,13 @@ class DbusHomeWizardEnergyP1Service:
         Update the DBus service with the latest P1 data.
         """
         try:
-            # get data from HW P1
-            meter_data = self._getP1Data()
+            # read cached data from background fetch thread (non-blocking)
+            with self._data_lock:
+                meter_data = self._cached_meter_data.copy()
+
+            if not meter_data:
+                return True
+
             config = self._getConfig()
             phases = config['DEFAULT']['Phases']
 
@@ -243,7 +275,7 @@ class DbusHomeWizardEnergyP1Service:
                 self._dbusservice['/Ac/Energy/Reverse'] = meter_data['total_power_export_kwh']
                 self._dbusservice['/Ac/L1/Energy/Forward'] = meter_data['total_power_import_kwh']
                 self._dbusservice['/Ac/L1/Energy/Reverse'] = meter_data['total_power_export_kwh']
-            if phases == '3':
+            elif phases == '3':
                 # remap phases based on L1Position
                 meter_data = self._remap_phases(meter_data)
                 # send data to DBus for 3 phase system
@@ -340,68 +372,34 @@ def main():
         DBusGMainLoop(set_as_default=True)
 
         # formatting
-        _kwh = lambda p, v: (str(round(v, 2)) + ' kWh')
-        _a = lambda p, v: (str(round(v, 1)) + ' A')
-        _w = lambda p, v: (str(round(v, 1)) + ' W')
-        _v = lambda p, v: (str(round(v, 1)) + ' V')
-
-        # Fetch initial data from P1 meter
-        try:
-            config = configparser.ConfigParser()
-            config.read("%s/config.ini" % (os.path.dirname(os.path.realpath(__file__))))
-            URL = "http://%s/api/v1/data" % (config['ONPREMISE']['Host'])
-            meter_r = requests.get(url=URL, timeout=5)
-            meter_data = meter_r.json()
-            initial_forward = meter_data['total_power_import_kwh']
-            initial_reverse = meter_data['total_power_export_kwh']
-            initial_power = meter_data['active_power_w']
-            initial_voltage_l1 = meter_data['active_voltage_l1_v']
-            initial_voltage_l2 = meter_data['active_voltage_l2_v']
-            initial_voltage_l3 = meter_data['active_voltage_l3_v']
-            initial_current_l1 = meter_data['active_current_l1_a']
-            initial_current_l2 = meter_data['active_current_l2_a']
-            initial_current_l3 = meter_data['active_current_l3_a']
-            initial_power_l1 = meter_data['active_power_l1_w']
-            initial_power_l2 = meter_data['active_power_l2_w']
-            initial_power_l3 = meter_data['active_power_l3_w']
-        except (ValueError, requests.exceptions.ConnectionError, requests.exceptions.Timeout, KeyError) as e:
-            logging.warning('Failed to fetch initial data from P1 meter, using default values. Details: %s', e)
-            initial_forward = 0
-            initial_reverse = 0
-            initial_power = 0
-            initial_voltage_l1 = 0
-            initial_voltage_l2 = 0
-            initial_voltage_l3 = 0
-            initial_current_l1 = 0
-            initial_current_l2 = 0
-            initial_current_l3 = 0
-            initial_power_l1 = 0
-            initial_power_l2 = 0
-            initial_power_l3 = 0
+        _kwh = lambda p, v: (str(round(v, 2)) + ' kWh') if v is not None else '---'
+        _a = lambda p, v: (str(round(v, 1)) + ' A') if v is not None else '---'
+        _w = lambda p, v: (str(round(v, 1)) + ' W') if v is not None else '---'
+        _v = lambda p, v: (str(round(v, 1)) + ' V') if v is not None else '---'
 
         # start our main-service
         pvac_output = DbusHomeWizardEnergyP1Service(
             paths={
-                '/Ac/Energy/Forward': {'initial': initial_forward, 'textformat': _kwh},  # energy bought from the grid
-                '/Ac/Energy/Reverse': {'initial': initial_reverse, 'textformat': _kwh},  # energy sold to the grid
-                '/Ac/Power': {'initial': initial_power, 'textformat': _w},
+                '/Ac/Energy/Forward': {'initial': None, 'textformat': _kwh},  # energy bought from the grid
+                '/Ac/Energy/Reverse': {'initial': None, 'textformat': _kwh},  # energy sold to the grid
+                '/Ac/Power': {'initial': None, 'textformat': _w},
 
-                '/Ac/L1/Voltage': {'initial': initial_voltage_l1, 'textformat': _v},
-                '/Ac/L2/Voltage': {'initial': initial_voltage_l2, 'textformat': _v},
-                '/Ac/L3/Voltage': {'initial': initial_voltage_l3, 'textformat': _v},
-                '/Ac/L1/Current': {'initial': initial_current_l1, 'textformat': _a},
-                '/Ac/L2/Current': {'initial': initial_current_l2, 'textformat': _a},
-                '/Ac/L3/Current': {'initial': initial_current_l3, 'textformat': _a},
-                '/Ac/L1/Power': {'initial': initial_power_l1, 'textformat': _w},
-                '/Ac/L2/Power': {'initial': initial_power_l2, 'textformat': _w},
-                '/Ac/L3/Power': {'initial': initial_power_l3, 'textformat': _w},
+                '/Ac/L1/Voltage': {'initial': None, 'textformat': _v},
+                '/Ac/L2/Voltage': {'initial': None, 'textformat': _v},
+                '/Ac/L3/Voltage': {'initial': None, 'textformat': _v},
+                '/Ac/L1/Current': {'initial': None, 'textformat': _a},
+                '/Ac/L2/Current': {'initial': None, 'textformat': _a},
+                '/Ac/L3/Current': {'initial': None, 'textformat': _a},
+                '/Ac/L1/Power': {'initial': None, 'textformat': _w},
+                '/Ac/L2/Power': {'initial': None, 'textformat': _w},
+                '/Ac/L3/Power': {'initial': None, 'textformat': _w},
 
-                '/Ac/L1/Energy/Forward': {'initial': initial_forward / 3, 'textformat': _kwh},
-                '/Ac/L2/Energy/Forward': {'initial': initial_forward / 3, 'textformat': _kwh},
-                '/Ac/L3/Energy/Forward': {'initial': initial_forward / 3, 'textformat': _kwh},
-                '/Ac/L1/Energy/Reverse': {'initial': initial_reverse / 3, 'textformat': _kwh},
-                '/Ac/L2/Energy/Reverse': {'initial': initial_reverse / 3, 'textformat': _kwh},
-                '/Ac/L3/Energy/Reverse': {'initial': initial_reverse / 3, 'textformat': _kwh},
+                '/Ac/L1/Energy/Forward': {'initial': None, 'textformat': _kwh},
+                '/Ac/L2/Energy/Forward': {'initial': None, 'textformat': _kwh},
+                '/Ac/L3/Energy/Forward': {'initial': None, 'textformat': _kwh},
+                '/Ac/L1/Energy/Reverse': {'initial': None, 'textformat': _kwh},
+                '/Ac/L2/Energy/Reverse': {'initial': None, 'textformat': _kwh},
+                '/Ac/L3/Energy/Reverse': {'initial': None, 'textformat': _kwh},
             })
         logging.info('Connected to dbus, and switching over to gobject.MainLoop() (= event based)')
         mainloop = gobject.MainLoop()
